@@ -17,7 +17,7 @@ import (
 )
 
 // CiliumHost returns a [BPFHost] for attaching bpf_host.c to cilium_host.
-func CiliumHost(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration) any {
+func CiliumHost(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration, link netlink.Link) any {
 	cfg := NewBPFHost(NodeConfig(lnc))
 
 	em := ep.GetNodeMAC()

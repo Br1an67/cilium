@@ -45,16 +45,16 @@ const (
 
 // epConfigs holds functions that yield a BPF configuration object for
 // an endpoint.
-var epConfigs funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration) any]
+var epConfigs funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration, netlink.Link) any]
 
 // epRenames holds functions that yield the map renames for an endpoint
 var epRenames funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration) map[string]string]
 
 // endpointConfiguration returns a slice of endpoint configuration objects
 // yielded by all registered config providers.
-func endpointConfiguration(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration) (configs []any) {
+func endpointConfiguration(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration, link netlink.Link) (configs []any) {
 	for f := range epConfigs.all() {
-		configs = append(configs, f(ep, lnc))
+		configs = append(configs, f(ep, lnc, link))
 	}
 	return configs
 }
@@ -172,7 +172,23 @@ func (l *loader) Unload(ep datapath.Endpoint) {
 // EndpointHash hashes the specified endpoint configuration with the current
 // datapath hash cache and returns the hash as string.
 func (l *loader) EndpointHash(cfg datapath.EndpointConfiguration, lnCfg *datapath.LocalNodeConfiguration) (string, error) {
-	return l.templateCache.baseHash.hashEndpoint(l.templateCache, lnCfg, cfg)
+	var (
+		err  error
+		link netlink.Link
+		log  = l.logger.With(logfields.EndpointID, cfg.GetID())
+	)
+
+	if cfg.GetIfIndex() != 0 {
+		link, err = safenetlink.LinkByIndex(cfg.GetIfIndex())
+		if err != nil {
+			return "", fmt.Errorf("EndpointHash retrieving device with ifindex %d: %w", cfg.GetIfIndex(), err)
+		}
+	} else {
+		link = &netlink.GenericLink{}
+		log.Info("EndpointHash using GenericLink as endpoint configuration ifindex is 0")
+	}
+
+	return l.templateCache.baseHash.hashEndpoint(l.templateCache, lnCfg, cfg, link)
 }
 
 func (l *loader) WriteEndpointConfig(w io.Writer, e datapath.EndpointConfiguration, lnCfg *datapath.LocalNodeConfiguration) error {
@@ -196,13 +212,19 @@ func reloadEndpoint(logger *slog.Logger, reg *registry.MapRegistry, db *statedb.
 	devices statedb.Table[*tables.Device], rm *routeReconciler.DesiredRouteManager,
 	ep datapath.Endpoint, lnc *datapath.LocalNodeConfiguration, spec *ebpf.CollectionSpec) error {
 
+	device := ep.InterfaceName()
+	iface, err := safenetlink.LinkByName(device)
+	if err != nil {
+		return fmt.Errorf("retrieving device %s: %w", device, err)
+	}
+
 	var obj lxcObjects
 	commit, err := bpf.LoadAndAssign(logger, &obj, spec, &bpf.CollectionOptions{
 		MapRegistry: reg,
 		CollectionOptions: ebpf.CollectionOptions{
 			Maps: ebpf.MapOptions{PinPath: bpf.TCGlobalsPath()},
 		},
-		Constants:      endpointConfiguration(ep, lnc),
+		Constants:      endpointConfiguration(ep, lnc, iface),
 		MapRenames:     endpointMapRenames(ep, lnc),
 		ConfigDumpPath: filepath.Join(ep.StateDir(), endpointConfig),
 	})
@@ -223,12 +245,6 @@ func reloadEndpoint(logger *slog.Logger, reg *registry.MapRegistry, db *statedb.
 	}
 	if err := obj.EgressPolicyMap.Update(uint32(ep.GetID()), obj.EgressPolicyProg, ebpf.UpdateAny); err != nil {
 		return fmt.Errorf("inserting endpoint egress policy program: %w", err)
-	}
-
-	device := ep.InterfaceName()
-	iface, err := safenetlink.LinkByName(device)
-	if err != nil {
-		return fmt.Errorf("retrieving device %s: %w", device, err)
 	}
 
 	linkDir := bpffsEndpointLinksDir(bpf.CiliumPath(), ep)

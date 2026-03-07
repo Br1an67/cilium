@@ -4,13 +4,15 @@
 package config
 
 import (
+	"github.com/vishvananda/netlink"
+
 	"github.com/cilium/cilium/pkg/byteorder"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/option"
 )
 
 // Endpoint returns a [BPFLXC] for an Endpoint.
-func Endpoint(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration) any {
+func Endpoint(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration, link netlink.Link) any {
 	cfg := NewBPFLXC(NodeConfig(lnc))
 
 	if ep.IPv4Address().IsValid() {

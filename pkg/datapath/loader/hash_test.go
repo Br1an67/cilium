@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/vishvananda/netlink"
 
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/option"
@@ -44,19 +45,20 @@ func TestHashEndpoint(t *testing.T) {
 	var base datapathHash
 	ep := testutils.NewTestEndpoint(t)
 	cfg := configWriterForTest(t)
+	link1 := &netlink.Veth{}
 
 	// Error from ConfigWriter is forwarded.
-	_, err := base.hashEndpoint(fakeConfigWriter{}, nil, nil)
+	_, err := base.hashEndpoint(fakeConfigWriter{}, nil, nil, link1)
 	require.Error(t, err)
 
 	// Hashing the endpoint gives a hash distinct from the base.
-	a, err := base.hashEndpoint(cfg, &localNodeConfig, &ep)
+	a, err := base.hashEndpoint(cfg, &localNodeConfig, &ep, link1)
 	require.NoError(t, err)
 	require.NotEqual(t, base.String(), a)
 
 	// When we configure the endpoint differently, it's different
 	ep.Opts.SetBool("foo", true)
-	b, err := base.hashEndpoint(cfg, &localNodeConfig, &ep)
+	b, err := base.hashEndpoint(cfg, &localNodeConfig, &ep, link1)
 	require.NoError(t, err)
 	require.NotEqual(t, a, b)
 }

@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/vishvananda/netlink"
+
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 )
 
@@ -24,7 +26,7 @@ func hashDatapath(c datapath.ConfigWriter, nodeCfg *datapath.LocalNodeConfigurat
 	return datapathHash(d.Sum(nil)), nil
 }
 
-func (d datapathHash) hashEndpoint(c datapath.ConfigWriter, nodeCfg *datapath.LocalNodeConfiguration, epCfg datapath.EndpointConfiguration) (string, error) {
+func (d datapathHash) hashEndpoint(c datapath.ConfigWriter, nodeCfg *datapath.LocalNodeConfiguration, epCfg datapath.EndpointConfiguration, link netlink.Link) (string, error) {
 	h := sha256.New()
 	_, _ = h.Write(d)
 	if err := c.WriteEndpointConfig(h, nodeCfg, epCfg); err != nil {
@@ -34,13 +36,13 @@ func (d datapathHash) hashEndpoint(c datapath.ConfigWriter, nodeCfg *datapath.Lo
 	// Include endpoint configuration in the hash, otherwise different runtime
 	// configurations will hash to the same value and the update will be skipped.
 	if epCfg.IsHost() {
-		for _, cfg := range ciliumHostConfiguration(epCfg, nodeCfg) {
+		for _, cfg := range ciliumHostConfiguration(epCfg, nodeCfg, link) {
 			if _, err := fmt.Fprintf(h, "%+v", cfg); err != nil {
 				return "", fmt.Errorf("hashing host configuration: %w", err)
 			}
 		}
 	} else {
-		for _, cfg := range endpointConfiguration(epCfg, nodeCfg) {
+		for _, cfg := range endpointConfiguration(epCfg, nodeCfg, link) {
 			if _, err := fmt.Fprintf(h, "%+v", cfg); err != nil {
 				return "", fmt.Errorf("hashing endpoint runtime configuration: %w", err)
 			}

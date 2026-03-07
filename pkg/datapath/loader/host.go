@@ -63,16 +63,16 @@ func reloadHostEndpoint(logger *slog.Logger, reg *registry.MapRegistry, ep datap
 
 // ciliumHostConfigs holds functions that yield a BPF configuration object for
 // cilium_host.
-var ciliumHostConfigs funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration) any]
+var ciliumHostConfigs funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration, netlink.Link) any]
 
 // ciliumHostRenames holds functions that yield BPF map renames for cilium_host.
 var ciliumHostRenames funcRegistry[func(datapath.EndpointConfiguration, *datapath.LocalNodeConfiguration) map[string]string]
 
 // ciliumHostConfiguration returns a slice of host configuration objects yielded
 // by all registered config providers of [ciliumHostConfigs].
-func ciliumHostConfiguration(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration) (configs []any) {
+func ciliumHostConfiguration(ep datapath.EndpointConfiguration, lnc *datapath.LocalNodeConfiguration, link netlink.Link) (configs []any) {
 	for f := range ciliumHostConfigs.all() {
-		configs = append(configs, f(ep, lnc))
+		configs = append(configs, f(ep, lnc, link))
 	}
 	return configs
 }
@@ -108,7 +108,7 @@ func attachCiliumHost(logger *slog.Logger, reg *registry.MapRegistry, ep datapat
 		CollectionOptions: ebpf.CollectionOptions{
 			Maps: ebpf.MapOptions{PinPath: bpf.TCGlobalsPath()},
 		},
-		Constants:      ciliumHostConfiguration(ep, lnc),
+		Constants:      ciliumHostConfiguration(ep, lnc, host),
 		MapRenames:     ciliumHostMapRenames(ep, lnc),
 		ConfigDumpPath: filepath.Join(bpfStateDeviceDir(ep.InterfaceName()), hostEndpointConfig),
 	})
