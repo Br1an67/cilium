@@ -1403,6 +1403,10 @@ static __always_inline int nodeport_svc_lb6(struct __ctx_buff *ctx,
 #  if defined(ENABLE_TPROXY)
 		return ctx_redirect_to_proxy_hairpin_ipv6(ctx, proxy_port);
 #  else
+		/* See IPv4 path for comments. */
+		if (CONFIG(link_type) == LINK_TYPE_BRIDGE)
+			return ctx_redirect_to_proxy_hairpin_ipv6(ctx, proxy_port);
+
 		cilium_dbg_capture(ctx, DBG_CAPTURE_PROXY_PRE, proxy_port);
 		ctx->mark = MARK_MAGIC_TO_PROXY | (proxy_port << 16);
 		cilium_dbg_capture(ctx, DBG_CAPTURE_PROXY_POST, proxy_port);
@@ -2784,6 +2788,14 @@ static __always_inline int nodeport_svc_lb4(struct __ctx_buff *ctx,
 #  if defined(ENABLE_TPROXY)
 		return ctx_redirect_to_proxy_hairpin_ipv4(ctx, ip4, proxy_port);
 #  else
+		/* When a bridge device has br_netfilter with bridge-nf-call-iptables=1,
+		 * the packet must be hairpinned via cilium_net instead of punting to the
+		 * stack, because ip_sabotage_in() would skip the TPROXY rule. We simplify
+		 * * the logic by always hairpinning to the proxy when it's a bridge.
+		 */
+		if (CONFIG(link_type) == LINK_TYPE_BRIDGE)
+			return ctx_redirect_to_proxy_hairpin_ipv4(ctx, ip4, proxy_port);
+
 		/* Pass the packet straight to the proxy, without redirecting via
 		 * cilium_host.
 		 */
