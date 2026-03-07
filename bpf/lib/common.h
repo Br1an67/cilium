@@ -20,6 +20,7 @@
 #include "tunnel.h"
 #include "notify.h"
 #include "drop_reasons.h"
+#include "link.h"
 
 #include "source_info.h"
 
