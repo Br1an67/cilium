@@ -169,6 +169,15 @@ func GTPPDPList() ([]*netlink.PDP, error) {
 	})
 }
 
+// LinkByIndex wraps netlink.LinkByIndex, but retries the call automatically
+// if netlink.ErrDumpInterrupted is returned
+func LinkByIndex(index int) (netlink.Link, error) {
+	return WithRetryResult(func() (netlink.Link, error) {
+		//nolint:forbidigo
+		return netlink.LinkByIndex(index)
+	})
+}
+
 // LinkByName wraps netlink.LinkByName, but retries the call automatically
 // if netlink.ErrDumpInterrupted is returned
 func LinkByName(name string) (netlink.Link, error) {
