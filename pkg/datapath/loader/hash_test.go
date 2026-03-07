@@ -46,6 +46,7 @@ func TestHashEndpoint(t *testing.T) {
 	ep := testutils.NewTestEndpoint(t)
 	cfg := configWriterForTest(t)
 	link1 := &netlink.Veth{}
+	link2 := &netlink.Device{}
 
 	// Error from ConfigWriter is forwarded.
 	_, err := base.hashEndpoint(fakeConfigWriter{}, nil, nil, link1)
@@ -61,6 +62,11 @@ func TestHashEndpoint(t *testing.T) {
 	b, err := base.hashEndpoint(cfg, &localNodeConfig, &ep, link1)
 	require.NoError(t, err)
 	require.NotEqual(t, a, b)
+
+	// Ensure with a different link type it's different
+	c, err := base.hashEndpoint(cfg, &localNodeConfig, &ep, link2)
+	require.NoError(t, err)
+	require.NotEqual(t, b, c)
 }
 
 func TestHashTemplate(t *testing.T) {

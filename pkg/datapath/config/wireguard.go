@@ -6,6 +6,7 @@ package config
 import (
 	"github.com/vishvananda/netlink"
 
+	dplink "github.com/cilium/cilium/pkg/datapath/link"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/option"
 )
@@ -26,6 +27,8 @@ func Wireguard(lnc *datapath.LocalNodeConfiguration, link netlink.Link) any {
 
 	cfg.EnableIPv4Fragments = option.Config.EnableIPv4 && option.Config.EnableIPv4FragmentsTracking
 	cfg.EnableIPv6Fragments = option.Config.EnableIPv6 && option.Config.EnableIPv6FragmentsTracking
+
+	cfg.LinkType = dplink.LinkToTypeEnum(link)
 
 	return cfg
 }
